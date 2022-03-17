@@ -64,11 +64,13 @@ func (me *ipUtil) GetLocalIp() string {
 	return ip
 }
 
-func (me *ipUtil) IsPing(host string, timeout time.Duration) bool {
+func (me *ipUtil) IsPing(host string, timeout time.Duration) (bool, error) {
+	if timeout <= 0 {
+		return false, fmt.Errorf("%s", "ping timeout 必须大于 0")
+	}
 	pinger, err := ping.NewPinger(host)
 	if err != nil {
-		fmt.Println(err)
-		return false
+		return false, err
 	}
 	pinger.Count = 1
 	pinger.Timeout = timeout
@@ -78,15 +80,14 @@ func (me *ipUtil) IsPing(host string, timeout time.Duration) bool {
 	// Linux 上，注意查看：https://github.com/go-ping/ping/blob/master/README.md#supported-operating-systems
 	err = pinger.Run() // Blocks until finished.
 	if err != nil {
-		fmt.Println(err)
 		if runtime.GOOS == "linux" {
-			fmt.Println(`Linux 平台，您可能需要执行以下命令：sudo sysctl -w net.ipv4.ping_group_range="0   2147483647"`)
+			return false, fmt.Errorf("%s %v", `Linux 平台，您可能需要执行以下命令：sudo sysctl -w net.ipv4.ping_group_range="0   2147483647"`, err)
 		}
-		return false
+		return false, err
 	}
 	stats := pinger.Statistics()
 	if stats.PacketsRecv >= 1 {
-		return true
+		return true, nil
 	}
-	return false
+	return false, nil
 }
